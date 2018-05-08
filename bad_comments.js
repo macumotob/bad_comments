@@ -1,6 +1,7 @@
 
 // beproduct Total :  244,776  Bad :  64,855  // doc.HeaderId === doc.CompanyId
 const ERROR_DOCUMENT_ID = "one item";
+const NULL_DOCUMENT_ID = "NULL DOC ID";
 var MongoClient = require('mongodb').MongoClient;
 
 var url = "mongodb://localhost:27017/";
@@ -53,7 +54,7 @@ function afterConnect(client){
 		            findComments(db,null, function(){
 						console.log("Pages length X == 0");
 						console.log("Page-Comments : ", comments.length);
-						checkComments();
+                        checkComments();
 					});
 					//SaveEmptyPage(backupCollection);
 					
@@ -85,8 +86,65 @@ function makeDocumentId(documentId) {
         return ERROR_DOCUMENT_ID;
     }
     else {
-
+        return NULL_DOCUMENT_ID;
     }
+}
+function syncComments(item) {
+    var main = item.comments[0];
+    item.comments.forEach(function (comment) {
+        if (comment != main) {
+            comment.status = "delete";
+            comment.Replies.forEach(function (rep) {
+                rep.moved = true;
+                main.Replies.push(rep);
+            });
+        }
+    });
+    main.Replies.sort( function(a, b) {
+        return a.CreateDate == b.CreateDate ? 0
+            : a.CreateDate > b.CreateDate ? -1 : 1;
+    });
+    main.status = "synced";
+}
+
+function groupByDocumentId(db) {
+    var data = [];
+    var tb = db.collection(backupCollectionName);
+    tb.aggregate([
+        {
+            $unwind: {
+                path: "$comments",
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $group: {
+                _id: "$comments.DocumentId",
+                count: { $sum: 1 }
+            }
+        }
+        ,
+        { $match: { count: { $gt: 1 } } }
+    ], function (err, result) {
+        if (err) {
+            console.log(err);
+        }
+        else {
+            result.each(function (e, item) {
+                if (e) throw e;
+                if (item) {
+                    console.log(item);
+                    data.push(item._id);
+                }
+                else {
+                    console.log("end");
+                    close();
+                }
+            });
+        }
+    }
+    );
+
 }
 function checkComments(){
 
@@ -109,14 +167,33 @@ function checkComments(){
     //   });
     uniq.forEach(function (item) {
         item.comments.forEach(function (comment) {
+            comment.message = "";
             comment.OldDocumentId = comment.DocumentId;
             comment.DocumentId = makeDocumentId(comment.DocumentId)
             if (comment.DocumentId == ERROR_DOCUMENT_ID) {
                 comment.DocumentId = item.page.HeaderId + "--" + item.page.ApplicationId;
-                item.message = ERROR_DOCUMENT_ID;
+                comment.message = ERROR_DOCUMENT_ID;
             }
-            });
+            else if (comment.DocumentId == NULL_DOCUMENT_ID) {
+                comment.message = NULL_DOCUMENT_ID;
+            }
+            if (item.comments.length == 0) {
+                comment.status = "error";
+            }
+            else if (item.comments.length == 1) {
+                comment.status = "update";
+            }
+            else {
+                comment.status = "sync";
+            }
+        });
+        if (item.comments.length > 1) {
+            item.status = "sync";
+            syncComments(item);
+        }
     });
+
+
     saveUniqueComments();
 }
 function findComments(db,tbComments,callback){
@@ -156,8 +233,9 @@ function close(){
 }
 
 function saveUniqueComments(backupCollection){
-   if(uniq.length == 0){
-       close();
+    if (uniq.length == 0) {
+        groupByDocumentId(dbo);
+       //close();
 	   return;
     }
     if (!backupCollection) {
