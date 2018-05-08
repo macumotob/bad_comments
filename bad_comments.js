@@ -134,6 +134,9 @@ function groupByDocumentId(db) {
                 if (e) throw e;
                 if (item) {
                     console.log(item);
+                    if (item.count > 5) {
+                        debugger;
+                    }
                     data.push(item._id);
                 }
                 else {
@@ -209,14 +212,16 @@ function findComments(db,tbComments,callback){
 	var query = { $or:[
     {"DocumentId" : page.HeaderId + "--" + page.ApplicationId + "--" + page.TimelineId},
 	{"DocumentId" : page.HeaderId + "--" + page.ApplicationId},
-	{"DocumentId" : page.HeaderId}
+	//{"DocumentId" : page.HeaderId}
   ]};
     tbComments.find(query).each(function (err,comment) {
 		if (err) throw err;
 		//console.log(comment);
 		if(comment){
             //console.log("comment id : " ,comment._id);	
-		    comments.push({ page: page, comments : comment});
+            if (comment.Type == "Like") {
+                comments.push({ page: page, comments: comment });
+            }
 		}
 		else{
 			findComments(db,tbComments,callback);
