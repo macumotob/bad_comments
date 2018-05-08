@@ -122,7 +122,7 @@ function syncComments(comments) {
             
             comment.status = "delete";
             comment.Replies.forEach(function (rep) {
-                rep.moved = true;
+                rep.moved = " moved from :" + comment._id + " to :" + main._id;
                 main.Replies.push(rep);
             });
         }
@@ -206,25 +206,25 @@ function checkComments(){
     //   });
     uniq.forEach(function (item) {
         item.comments.forEach(function (comment) {
-            comment.message = "";
+            //comment.message = "";
             comment.OldDocumentId = comment.DocumentId;
             comment.DocumentId = makeDocumentId(comment.DocumentId)
-            if (comment.DocumentId == ERROR_DOCUMENT_ID) {
-                comment.DocumentId = item.page.HeaderId + "--" + item.page.ApplicationId;
-                comment.message = ERROR_DOCUMENT_ID;
-            }
-            else if (comment.DocumentId == NULL_DOCUMENT_ID) {
-                comment.message = NULL_DOCUMENT_ID;
-            }
-            if (item.comments.length == 0) {
-                comment.status = "error";
-            }
-            else if (item.comments.length == 1) {
-                comment.status = "update";
-            }
-            else {
-                comment.status = "sync";
-            }
+            //if (comment.DocumentId == ERROR_DOCUMENT_ID) {
+            //    comment.DocumentId = item.page.HeaderId + "--" + item.page.ApplicationId;
+            //    comment.message = ERROR_DOCUMENT_ID;
+            //}
+            //else if (comment.DocumentId == NULL_DOCUMENT_ID) {
+            //    comment.message = NULL_DOCUMENT_ID;
+            //}
+            //if (item.comments.length == 0) {
+            //    comment.status = "error";
+            //}
+            //else if (item.comments.length == 1) {
+            //    comment.status = "update";
+            //}
+            //else {
+            //    comment.status = "sync";
+            //}
         });
         //if (item.comments.length > 1) {
         //    item.status = "sync";
