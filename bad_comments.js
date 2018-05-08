@@ -137,7 +137,7 @@ function groupByDocumentId(db) {
                     data.push(item._id);
                 }
                 else {
-                    console.log("end");
+                    console.log("end");//
                     close();
                 }
             });
