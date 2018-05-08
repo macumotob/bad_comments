@@ -1,11 +1,11 @@
 
 // beproduct Total :  244,776  Bad :  64,855  // doc.HeaderId === doc.CompanyId
-
+const ERROR_DOCUMENT_ID = "one item";
 var MongoClient = require('mongodb').MongoClient;
 
 var url = "mongodb://localhost:27017/";
 var database = "beproduct";
-var backupCollectionName = "PagesHeaderIdCompanyIdApplicationIdTimelineIdEmpty";
+var backupCollectionName = "CommentsBackupUnique";
 
 
 //var url = "mongodb://bedevuser:8uRt46Ghtp13@ds036299-a0.mlab.com:36299,ds036299-a1.mlab.com:36294/devbeproduct?replicaSet=rs-ds036299";
@@ -33,8 +33,7 @@ function afterConnect(client){
 	dbo = db;
 
     var collection = db.collection("Pages");
-    var backupCollection = db.collection(backupCollectionName);
-	
+    	
 	db.collection("Applications").find({ "MasterFolder": { $ne: "Request" }}).each(function(err, doc) {
 		if (err) throw err;
 	    if(doc){
@@ -54,7 +53,6 @@ function afterConnect(client){
 		            findComments(db,null, function(){
 						console.log("Pages length X == 0");
 						console.log("Page-Comments : ", comments.length);
-						close();
 						checkComments();
 					});
 					//SaveEmptyPage(backupCollection);
@@ -73,39 +71,53 @@ function findInUnique(page_id){
 	}
 	return null;
 }
+function makeDocumentId(documentId) {
+
+    var x = documentId.split("--");
+
+    if (x.length == 3) {
+        return x[0] + "--" + x[1];
+    }
+    else if (x.length == 2) {
+        return x[0] + "--" + x[1];
+    }
+    else if (x.length == 1) {
+        return ERROR_DOCUMENT_ID;
+    }
+    else {
+
+    }
+}
 function checkComments(){
 
 	comments.forEach( function(item){
 		var uniqItem = findInUnique(item.page._id);
-		if(uniqItem == null){
-		  uniq.push( { page_id : item.page._id , data : [item]})	;
+        if (uniqItem == null) {
+            uniq.push({ page_id: item.page._id, page: item.page, comments: [item.comments] });
 		}
 		else{
 			
-			uniqItem.data.push(item);
+			uniqItem.comments.push(item.comments);
 		}
 		//console.log(list);
 		
 	});
-	uniq.sort(function(a, b){
-		if(a.page_id < b.page_id) return -1;
-		if(a.page_id > b.page_id) return 1;
-		return 0;
+	//uniq.sort(function(a, b){
+	//	if(a.page_id < b.page_id) return -1;
+	//	if(a.page_id > b.page_id) return 1;
+	//	return 0;
+    //   });
+    uniq.forEach(function (item) {
+        item.comments.forEach(function (comment) {
+            comment.OldDocumentId = comment.DocumentId;
+            comment.DocumentId = makeDocumentId(comment.DocumentId)
+            if (comment.DocumentId == ERROR_DOCUMENT_ID) {
+                comment.DocumentId = item.page.HeaderId + "--" + item.page.ApplicationId;
+                item.message = ERROR_DOCUMENT_ID;
+            }
+            });
     });
-	uniq.forEach(function(item){
-	  if(item.data.length == 1){
-		  
-		  console.log("\n------- Page:",item.page_id,item.data[0].comments.DocumentId);	
-		  var x = item.data[0].comments.DocumentId.split("--");
-		  console.log(x);
-		  
-	  }
-	  else{
-		  console.log("\n------- Page 2 :",item.page_id,item.data.length);	
-		  
-	  }
-	});
-    console.log(uniq[uniq.length-1]);
+    saveUniqueComments();
 }
 function findComments(db,tbComments,callback){
 	//console.log("Pages length : ",pages.length );
@@ -143,23 +155,20 @@ function close(){
 	//console.log("\n\n******** DONE ");
 }
 
-function SaveEmptyPage1(collection){
-   if(pages.length == 0){
-		deleteEmptyPages();
+function saveUniqueComments(backupCollection){
+   if(uniq.length == 0){
+       close();
 	   return;
-   }
-   var page = pages.pop();
+    }
+    if (!backupCollection) {
+        backupCollection = dbo.collection(backupCollectionName);
+    }
+   var item = uniq.pop();
    
-  collection.insertOne(page, function(err, res) {
-    if (err) throw err;
-    console.log("left : ", pages.length, " inserted :", res.insertedCount , " insertedId :" ,res.insertedId);
-	pagesForDelete.push(page._id);
-	if(pages.length > 0){
-		SaveEmptyPage(collection);
-	}
-	else{
-		//deleteEmptyPages();
-	}
+    backupCollection.insertOne(item, function(err, res) {
+        if (err) throw err;
+        //pagesForDelete.push(page._id);
+          saveUniqueComments(backupCollection);
   });
 }
 function deleteEmptyPages1(collection){
