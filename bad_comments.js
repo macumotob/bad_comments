@@ -165,9 +165,14 @@ function groupByDocumentId(db) {
                 }
                 else {
                     makeCommentsStatus(data);
+
                     db.collection("CommentsForUpdate").insertMany(commentsStatus, function (er, result) {
                         if (er) throw er;
                         console.log("end");//
+                        commentsStatus.forEach(function (x) {
+                            prepareForSave(x);
+                        });
+                        
                         close();
                     });
                 }
@@ -184,6 +189,13 @@ function makeCommentsStatus(data) {
         syncComments(list);
     });
 
+}
+function prepareForSave(comment) {
+    delete comment["OldDocumentId"];
+    delete comment["status"];
+    comment.Replies.forEach(function (rep) {
+        delete rep["moved"];
+    });
 }
 function checkComments(){
 
