@@ -131,7 +131,7 @@ function syncComments(comments) {
         return a.CreateDate == b.CreateDate ? 0
             : a.CreateDate > b.CreateDate ? -1 : 1;
     });
-    main.status = "synced";
+    main.status = "update";
 }
 
 function groupByDocumentId(db) {
@@ -168,12 +168,15 @@ function groupByDocumentId(db) {
 
                     db.collection("CommentsForUpdate").insertMany(commentsStatus, function (er, result) {
                         if (er) throw er;
-                        console.log("end");//
-                        commentsStatus.forEach(function (x) {
-                            prepareForSave(x);
-                        });
-                        
                         close();
+                        //commentsStatus.forEach(function (x) {
+                        //    prepareForSave(x);
+                        //});
+                        //updateWorkingComments(db.collection("Comments"), function () {
+                        //    console.log("end");//
+                        //    close();
+                        //});
+                        
                     });
                 }
             });
@@ -188,6 +191,35 @@ function makeCommentsStatus(data) {
             });
         syncComments(list);
     });
+
+}
+function updateWorkingComments(col,callback) {
+    if (commentsStatus.length == 0) {
+        callback();
+        return;
+    }
+    var comment = commentsStatus.pop();
+    if (comment.status == "update") {
+        prepareForSave(comment);
+        var query = { _id: comment._id };
+        col.replaceOne(query, comment);
+        updateWorkingComments(col, callback);
+        //col.replaceOne(query, comment, function (err, result) {
+        //    if (err) throw err;
+        //    updateWorkingComments(col, callback);
+        //});
+    }
+    else if (comment.status == "delete") {
+        prepareForSave(comment);
+        var query = { _id: comment._id };
+       
+        col.deleteOne(query);
+        updateWorkingComments(col, callback);
+        //col.deleteOne(query,null, function (err, result) {
+        //    if (err) throw err;
+        //    updateWorkingComments(col, callback);
+        //});
+    }
 
 }
 function prepareForSave(comment) {
