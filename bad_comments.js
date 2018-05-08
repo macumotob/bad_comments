@@ -19,7 +19,9 @@ var appIDs = [];
 var comments = [];
 var dbo;
 var uniq = [];
-	
+var commentsOnly = [];	
+
+var commentsStatus = [];	
 MongoClient.connect(url, function(err, client) {
   if (err) throw err;
   console.log("Connected");
@@ -89,10 +91,35 @@ function makeDocumentId(documentId) {
         return NULL_DOCUMENT_ID;
     }
 }
-function syncComments(item) {
-    var main = item.comments[0];
-    item.comments.forEach(function (comment) {
+//function syncComments(item) {
+//    var main = item.comments[0];
+//    item.comments.forEach(function (comment) {
+//        if (comment != main) {
+//            comment.status = "delete";
+//            comment.Replies.forEach(function (rep) {
+//                rep.moved = true;
+//                main.Replies.push(rep);
+//            });
+//        }
+//    });
+//    main.Replies.sort( function(a, b) {
+//        return a.CreateDate == b.CreateDate ? 0
+//            : a.CreateDate > b.CreateDate ? -1 : 1;
+//    });
+//    main.status = "synced";
+//}
+function syncComments(comments) {
+    if (comments.length == 1) {
+        
+        comments[0].status = "update";
+        commentsStatus.push(comments[0]);
+        return;
+    }
+    var main = comments[0];
+    comments.forEach(function (comment) {
+        commentsStatus.push(comment);
         if (comment != main) {
+            
             comment.status = "delete";
             comment.Replies.forEach(function (rep) {
                 rep.moved = true;
@@ -100,7 +127,7 @@ function syncComments(item) {
             });
         }
     });
-    main.Replies.sort( function(a, b) {
+    main.Replies.sort(function (a, b) {
         return a.CreateDate == b.CreateDate ? 0
             : a.CreateDate > b.CreateDate ? -1 : 1;
     });
@@ -124,7 +151,7 @@ function groupByDocumentId(db) {
             }
         }
         ,
-        { $match: { count: { $gt: 1 } } }
+        //{ $match: { count: { $gt: 1 } } }
     ], function (err, result) {
         if (err) {
             console.log(err);
@@ -134,19 +161,28 @@ function groupByDocumentId(db) {
                 if (e) throw e;
                 if (item) {
                     console.log(item);
-                    if (item.count > 5) {
-                        debugger;
-                    }
-                    data.push(item._id);
+                    data.push({ documentId: item._id, count: item.count });
                 }
                 else {
-                    console.log("end");//
-                    close();
+                    makeCommentsStatus(data);
+                    db.collection("CommentsForUpdate").insertMany(commentsStatus, function (er, result) {
+                        if (er) throw er;
+                        console.log("end");//
+                        close();
+                    });
                 }
             });
         }
     }
     );
+}
+function makeCommentsStatus(data) {
+    data.forEach(function (item) {
+        var list = commentsOnly.filter(function (e, i, a) {
+            return e.DocumentId == item.documentId;
+            });
+        syncComments(list);
+    });
 
 }
 function checkComments(){
@@ -190,10 +226,10 @@ function checkComments(){
                 comment.status = "sync";
             }
         });
-        if (item.comments.length > 1) {
-            item.status = "sync";
-            syncComments(item);
-        }
+        //if (item.comments.length > 1) {
+        //    item.status = "sync";
+        //    syncComments(item);
+        //}
     });
 
 
@@ -246,8 +282,10 @@ function saveUniqueComments(backupCollection){
     if (!backupCollection) {
         backupCollection = dbo.collection(backupCollectionName);
     }
-   var item = uniq.pop();
-   
+    var item = uniq.pop();
+    item.comments.forEach(function (com) {
+        commentsOnly.push(com);
+    } );
     backupCollection.insertOne(item, function(err, res) {
         if (err) throw err;
         //pagesForDelete.push(page._id);
