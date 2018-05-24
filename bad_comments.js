@@ -1,4 +1,5 @@
 
+//24 may 2018
 // beproduct Total :  244,776  Bad :  64,855  // doc.HeaderId === doc.CompanyId
 const ERROR_DOCUMENT_ID = "one item";
 const NULL_DOCUMENT_ID = "NULL DOC ID";
