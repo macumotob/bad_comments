@@ -34,7 +34,9 @@ function afterConnect(client){
 	server = client;
 	
 	var db = client.db(database);
-	dbo = db;
+    dbo = db;
+    db.collection("CommentsBackupUnique").drop();
+    db.collection("CommentsForUpdate").drop();
 
     var collection = db.collection("Pages");
     	
